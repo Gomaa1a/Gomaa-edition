@@ -43,135 +43,195 @@ const generateShareCard = (props: ShareResultsProps): Promise<string> => {
     canvas.height = 1080;
     const ctx = canvas.getContext("2d")!;
 
-    // Modern gradient background
+    // ── Rich dark gradient background ──
     const bgGrad = ctx.createLinearGradient(0, 0, 1080, 1080);
-    bgGrad.addColorStop(0, "#6366f1");
-    bgGrad.addColorStop(0.5, "#3b82f6");
-    bgGrad.addColorStop(1, "#06b6d4");
+    bgGrad.addColorStop(0, "#0f0d1a");
+    bgGrad.addColorStop(0.4, "#1a1040");
+    bgGrad.addColorStop(0.7, "#0d1f3c");
+    bgGrad.addColorStop(1, "#0a0a14");
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, 1080, 1080);
 
-    // Add pattern overlay
-    const patternCanvas = document.createElement("canvas");
-    patternCanvas.width = 120;
-    patternCanvas.height = 120;
-    const patternCtx = patternCanvas.getContext("2d")!;
-    patternCtx.fillStyle = "rgba(255,255,255,0.05)";
-    for (let i = 0; i < 120; i += 15) {
-      patternCtx.beginPath();
-      patternCtx.arc(i, i, 8, 0, Math.PI * 2);
-      patternCtx.fill();
-    }
-    const pattern = ctx.createPattern(patternCanvas, "repeat")!;
-    ctx.fillStyle = pattern;
-    ctx.fillRect(0, 0, 1080, 1080);
-
-    // Top badge
-    ctx.fillStyle = "rgba(255,255,255,0.15)";
-    ctx.fillRect(0, 0, 1080, 160);
-    ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
-    ctx.font = "bold 32px system-ui";
-    ctx.textAlign = "center";
-    ctx.fillText("🚀 I ACED MY INTERVIEW 🚀", 540, 110);
-
-    // Certificate-like border
-    ctx.strokeStyle = "rgba(255,255,255,0.3)";
-    ctx.lineWidth = 4;
-    ctx.strokeRect(60, 180, 960, 720);
-
-    // Inner decorative border
-    ctx.strokeStyle = "rgba(255,255,255,0.15)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(80, 200, 920, 680);
-
-    // Achievement badge (tier based on score)
-    const getAchievementTier = (score: number) => {
-      if (score >= 90) return { emoji: "🏆", tier: "ELITE", color: "#FFD700" };
-      if (score >= 80) return { emoji: "⭐", tier: "ADVANCED", color: "#C0C0C0" };
-      if (score >= 70) return { emoji: "🎯", tier: "PROFICIENT", color: "#CD7F32" };
-      return { emoji: "✨", tier: "DEVELOPING", color: "#87CEEB" };
+    // ── Ambient glow blobs ──
+    const drawBlob = (x: number, y: number, r: number, color: string) => {
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, color);
+      g.addColorStop(1, "transparent");
+      ctx.fillStyle = g;
+      ctx.fillRect(x - r, y - r, r * 2, r * 2);
     };
+    drawBlob(200, 200, 300, "rgba(99,102,241,0.12)");
+    drawBlob(880, 400, 350, "rgba(168,85,247,0.10)");
+    drawBlob(540, 900, 280, "rgba(34,211,238,0.08)");
 
-    const achievement = getAchievementTier(props.overallScore);
-
-    // Tier badge
+    // ── Top section: Logo + tier badge ──
     ctx.fillStyle = "rgba(255,255,255,0.95)";
-    ctx.font = "bold 24px system-ui";
+    ctx.font = "bold 28px 'Space Grotesk', system-ui";
     ctx.textAlign = "center";
-    ctx.fillText(`${achievement.emoji} ${achievement.tier} ${achievement.emoji}`, 540, 270);
+    ctx.fillText("HireReady", 540, 80);
 
-    // Role and level
-    ctx.fillStyle = "rgba(255,255,255,0.8)";
-    ctx.font = "600 28px system-ui";
-    ctx.fillText(props.role, 540, 330);
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.font = "600 14px 'Inter', system-ui";
+    ctx.fillText("AI MOCK INTERVIEW SCORECARD", 540, 110);
 
-    ctx.fillStyle = "rgba(255,255,255,0.6)";
-    ctx.font = "500 20px system-ui";
-    ctx.fillText("Interview Performance", 540, 365);
+    // ── Tier badge ──
+    const getTier = (score: number) => {
+      if (score >= 90) return { emoji: "🏆", label: "ELITE", gradient: ["#FFD700", "#F59E0B"] };
+      if (score >= 80) return { emoji: "⭐", label: "ADVANCED", gradient: ["#A78BFA", "#7C3AED"] };
+      if (score >= 70) return { emoji: "🎯", label: "PROFICIENT", gradient: ["#60A5FA", "#3B82F6"] };
+      return { emoji: "✨", label: "DEVELOPING", gradient: ["#34D399", "#10B981"] };
+    };
+    const tier = getTier(props.overallScore);
 
-    // Big score with glow effect
-    ctx.fillStyle = achievement.color;
-    ctx.font = "900 140px system-ui";
-    ctx.fillText(`${props.overallScore}`, 540, 510);
+    // Tier pill
+    const pillW = 220, pillH = 44, pillX = 540 - pillW / 2, pillY = 130;
+    const pillGrad = ctx.createLinearGradient(pillX, pillY, pillX + pillW, pillY);
+    pillGrad.addColorStop(0, tier.gradient[0]);
+    pillGrad.addColorStop(1, tier.gradient[1]);
+    ctx.fillStyle = pillGrad;
+    ctx.beginPath();
+    ctx.roundRect(pillX, pillY, pillW, pillH, 22);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 18px 'Space Grotesk', system-ui";
+    ctx.fillText(`${tier.emoji}  ${tier.label}`, 540, pillY + 29);
 
-    ctx.fillStyle = "rgba(255,255,255,0.7)";
-    ctx.font = "600 36px system-ui";
-    ctx.fillText("/ 100", 540, 550);
+    // ── Central score ring ──
+    const cx = 540, cy = 360, outerR = 130, innerR = 105;
+    // Track ring
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+    ctx.lineWidth = outerR - innerR;
+    ctx.strokeStyle = "rgba(255,255,255,0.07)";
+    ctx.stroke();
+    // Score arc
+    const pct = props.overallScore / 100;
+    const startAngle = -Math.PI / 2;
+    const endAngle = startAngle + pct * Math.PI * 2;
+    const arcGrad = ctx.createLinearGradient(cx - outerR, cy - outerR, cx + outerR, cy + outerR);
+    arcGrad.addColorStop(0, tier.gradient[0]);
+    arcGrad.addColorStop(1, tier.gradient[1]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, (outerR + innerR) / 2, startAngle, endAngle);
+    ctx.lineWidth = outerR - innerR;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = arcGrad;
+    ctx.stroke();
+    // Score number
+    ctx.fillStyle = "#fff";
+    ctx.font = "900 80px 'Space Grotesk', system-ui";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`${props.overallScore}`, cx, cy - 8);
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.font = "600 22px 'Inter', system-ui";
+    ctx.fillText("/ 100", cx, cy + 42);
+    ctx.textBaseline = "alphabetic";
 
-    // Score breakdown bars - more modern style
+    // ── Role label ──
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.font = "600 26px 'Space Grotesk', system-ui";
+    ctx.fillText(props.role, 540, 530);
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.font = "500 16px 'Inter', system-ui";
+    ctx.fillText(props.date, 540, 560);
+
+    // ── Score breakdown cards ──
     const scores = [
-      { label: "💬 Communication", value: props.commScore },
-      { label: "🎯 Clarity", value: props.clarityScore },
-      { label: "💪 Confidence", value: props.confScore },
-      { label: "📐 Structure", value: props.structScore },
+      { icon: "💬", label: "Communication", value: props.commScore, color: "#60A5FA" },
+      { icon: "🎯", label: "Clarity", value: props.clarityScore, color: "#A78BFA" },
+      { icon: "💪", label: "Confidence", value: props.confScore, color: "#F472B6" },
+      { icon: "📐", label: "Structure", value: props.structScore, color: "#34D399" },
     ];
 
-    const barStartY = 600;
-    const barH = 28;
-    const barGap = 65;
-    const barX = 150;
-    const barW = 780;
+    const cardW = 210, cardH = 140, cardGap = 22;
+    const totalW = cardW * 4 + cardGap * 3;
+    const startX = (1080 - totalW) / 2;
+    const cardY = 600;
 
     scores.forEach((s, i) => {
-      const y = barStartY + i * barGap;
-      
-      // Label with emoji
-      ctx.fillStyle = "rgba(255,255,255,0.85)";
-      ctx.font = "600 20px system-ui";
-      ctx.textAlign = "left";
-      ctx.fillText(s.label, barX, y + 6);
-      
-      // Value
-      ctx.textAlign = "right";
-      ctx.fillStyle = "rgba(255,255,255,0.9)";
-      ctx.font = "bold 20px system-ui";
-      ctx.fillText(`${Math.round(s.value / 10)}/10`, barX + barW + 20, y + 6);
-      
-      // Bar background with blur effect
-      ctx.fillStyle = "rgba(255,255,255,0.15)";
+      const x = startX + i * (cardW + cardGap);
+      // Card bg
+      ctx.fillStyle = "rgba(255,255,255,0.05)";
       ctx.beginPath();
-      ctx.roundRect(barX, y - 10, barW, barH, 12);
+      ctx.roundRect(x, cardY, cardW, cardH, 16);
       ctx.fill();
-      
-      // Bar fill with gradient
-      const fillGrad = ctx.createLinearGradient(barX, y - 10, barX + barW, y - 10);
-      fillGrad.addColorStop(0, "rgba(255,255,255,0.8)");
-      fillGrad.addColorStop(1, "rgba(255,255,255,1)");
-      ctx.fillStyle = fillGrad;
+      // Card border
+      ctx.strokeStyle = "rgba(255,255,255,0.08)";
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.roundRect(barX, y - 10, (barW * s.value) / 100, barH, 12);
+      ctx.roundRect(x, cardY, cardW, cardH, 16);
+      ctx.stroke();
+      // Icon
+      ctx.font = "28px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(s.icon, x + cardW / 2, cardY + 38);
+      // Value
+      ctx.fillStyle = s.color;
+      ctx.font = "bold 32px 'Space Grotesk', system-ui";
+      ctx.fillText(`${Math.round(s.value / 10)}`, x + cardW / 2, cardY + 80);
+      ctx.fillStyle = "rgba(255,255,255,0.3)";
+      ctx.font = "600 16px 'Inter', system-ui";
+      ctx.fillText("/10", x + cardW / 2 + 24, cardY + 80);
+      // Label
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.font = "500 13px 'Inter', system-ui";
+      ctx.fillText(s.label, x + cardW / 2, cardY + 118);
+    });
+
+    // ── Mini bar charts under each card ──
+    scores.forEach((s, i) => {
+      const x = startX + i * (cardW + cardGap) + 30;
+      const barY = cardY + cardH + 12;
+      const barW = cardW - 60, barH = 4;
+      ctx.fillStyle = "rgba(255,255,255,0.07)";
+      ctx.beginPath();
+      ctx.roundRect(x, barY, barW, barH, 2);
+      ctx.fill();
+      ctx.fillStyle = s.color;
+      ctx.beginPath();
+      ctx.roundRect(x, barY, (barW * s.value) / 100, barH, 2);
       ctx.fill();
     });
 
-    // Footer call-to-action
-    ctx.fillStyle = "rgba(255,255,255,0.95)";
-    ctx.font = "bold 32px system-ui";
-    ctx.textAlign = "center";
-    ctx.fillText("CAN YOU BEAT MY SCORE?", 540, 1000);
+    // ── Divider line ──
+    ctx.strokeStyle = "rgba(255,255,255,0.06)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(140, 810);
+    ctx.lineTo(940, 810);
+    ctx.stroke();
 
-    ctx.fillStyle = "rgba(255,255,255,0.7)";
-    ctx.font = "500 22px system-ui";
-    ctx.fillText("Powered by HireReady AI 🤖", 540, 1035);
+    // ── Motivational CTA ──
+    const ctaTexts = [
+      { min: 90, text: "Interview mastery unlocked! 🔥" },
+      { min: 80, text: "Outstanding performance! 💪" },
+      { min: 70, text: "Solid skills — keep leveling up! 🚀" },
+      { min: 0, text: "Every interview makes you stronger! ✨" },
+    ];
+    const cta = ctaTexts.find(c => props.overallScore >= c.min)!;
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.font = "bold 28px 'Space Grotesk', system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText(cta.text, 540, 870);
+
+    // ── Challenge line ──
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    ctx.font = "500 18px 'Inter', system-ui";
+    ctx.fillText("Can you beat my score? Try it free →", 540, 920);
+
+    // ── Footer ──
+    ctx.fillStyle = "rgba(255,255,255,0.25)";
+    ctx.font = "600 14px 'Inter', system-ui";
+    ctx.fillText("hireready.ai", 540, 1020);
+
+    // Small decorative dots
+    for (let i = 0; i < 5; i++) {
+      ctx.fillStyle = "rgba(255,255,255,0.15)";
+      ctx.beginPath();
+      ctx.arc(540 - 40 + i * 20, 1050, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     resolve(canvas.toDataURL("image/png"));
   });

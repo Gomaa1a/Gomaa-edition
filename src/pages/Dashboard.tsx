@@ -3,7 +3,7 @@ import Logo from "@/components/Logo";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { CreditCard, CheckCircle, Trophy, Mic, ArrowRight, Lightbulb, Map } from "lucide-react";
+import { CreditCard, CheckCircle, Trophy, Mic, ArrowRight, Lightbulb, Map, User } from "lucide-react";
 import DownloadShareCard from "@/components/dashboard/DownloadShareCard";
 import GoalsDisplay from "@/components/dashboard/GoalsDisplay";
 import Achievements from "@/components/dashboard/Achievements";
@@ -121,11 +121,21 @@ const Dashboard = () => {
       </nav>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="mb-2 font-heading text-3xl font-extrabold">Hey there 👋</h1>
-          <p className="text-muted-foreground">
-            You have <span className="font-bold text-primary">{credits} interviews</span> remaining.
-          </p>
+        {/* Profile card */}
+        <div className="mb-8 flex items-center gap-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <User className="h-7 w-7" />
+          </div>
+          <div>
+            <h1 className="font-heading text-2xl font-extrabold">
+              Hey{user?.email ? `, ${user.email.split("@")[0]}` : ""} 👋
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {completedInterviews.length === 0
+                ? "Welcome! Start your first mock interview to get going."
+                : `${completedInterviews.length} interview${completedInterviews.length > 1 ? "s" : ""} completed · Best score: ${bestScore}%`}
+            </p>
+          </div>
         </div>
 
         {/* Goals Section */}

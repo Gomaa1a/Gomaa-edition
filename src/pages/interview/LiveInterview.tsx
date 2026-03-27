@@ -431,22 +431,21 @@ const LiveInterview = () => {
   // ── Insufficient credits screen ──
   if (insufficientCredits) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-ink p-8 text-center">
-        <div className="relative max-w-md overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] p-10 backdrop-blur-xl">
-          <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-coral/20 blur-[60px]" />
+      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-background p-8 text-center">
+        <div className="relative max-w-md overflow-hidden rounded-3xl border-2 border-ink bg-card p-10">
           <div className="relative">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-coral/20">
               <span className="text-3xl">💳</span>
             </div>
-            <h2 className="mb-2 font-heading text-2xl font-bold text-white">Out of Credits</h2>
-            <p className="mb-8 font-body text-sm text-white/50">
+            <h2 className="mb-2 font-heading text-2xl font-bold text-foreground">Out of Credits</h2>
+            <p className="mb-8 font-body text-sm text-muted-foreground">
               You need at least 1 credit to start an interview.
             </p>
             <div className="flex flex-col gap-3">
-              <Link to="/pricing" className="flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 font-heading text-sm font-bold uppercase tracking-wide text-white transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/25">
+              <Link to="/pricing" className="neo-btn bg-primary text-primary-foreground">
                 Buy Credits <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link to="/dashboard" className="flex items-center justify-center rounded-full border border-white/10 px-6 py-3 font-heading text-sm font-bold uppercase tracking-wide text-white/70 transition-all hover:bg-white/5">
+              <Link to="/dashboard" className="neo-btn bg-background text-foreground">
                 Back to Dashboard
               </Link>
             </div>
@@ -457,14 +456,8 @@ const LiveInterview = () => {
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-ink">
-      {/* Ambient background */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-40 top-1/4 h-80 w-80 rounded-full bg-primary/[0.07] blur-[100px]" />
-        <div className="absolute -right-40 top-1/3 h-72 w-72 rounded-full bg-purple/[0.06] blur-[100px]" />
-        <div className="absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-accent/[0.04] blur-[100px]" />
-      </div>
-
+    <div className="flex h-screen flex-col overflow-hidden bg-[#f8fafb]">
+      {/* Google Meet-style top bar */}
       <InterviewTopBar
         timeLeft={timeLeft}
         formatTime={formatTime}
@@ -477,87 +470,91 @@ const LiveInterview = () => {
       <div className="relative flex flex-1 flex-col items-center justify-center px-4">
         {!interviewStarted ? (
           /* ─── PRE-INTERVIEW LOBBY ─── */
-          <div className="flex flex-col items-center gap-8 text-center animate-fadeUp">
-            <AIOrb state="idle" size={160} />
+          <div className="flex flex-col items-center gap-8 text-center">
+            <div className="rounded-3xl border-2 border-ink bg-card p-12 shadow-lg">
+              <AIOrb state="idle" size={140} />
+            </div>
             <div className="max-w-lg">
-              <h1 className="mb-2 font-heading text-3xl font-bold tracking-tight text-white md:text-4xl">
+              <h1 className="mb-2 font-heading text-3xl font-bold tracking-tight text-foreground md:text-4xl">
                 Ready when you are
               </h1>
               {interviewData && (
                 <div className="mb-3 flex items-center justify-center gap-2">
-                  <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 font-heading text-xs font-semibold uppercase tracking-wider text-primary">
+                  <span className="neo-badge bg-primary/10 text-primary">
                     {interviewData.role}
                   </span>
-                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 font-heading text-xs font-semibold uppercase tracking-wider text-white/50">
+                  <span className="neo-badge bg-muted text-muted-foreground">
                     {interviewData.level}
                   </span>
                 </div>
               )}
               {/* Interview structure preview */}
-              <div className="mb-4 flex items-center justify-center gap-1 text-white/25 text-[11px] font-heading font-semibold uppercase tracking-wider">
+              <div className="mb-4 flex items-center justify-center gap-1 text-muted-foreground text-[11px] font-heading font-semibold uppercase tracking-wider">
                 {["Opening", "Technical", "Behavioral", "Situational", "Closing"].map((s, i, arr) => (
                   <span key={s} className="flex items-center gap-1">
                     <span>{s}</span>
-                    {i < arr.length - 1 && <span className="text-white/15">→</span>}
+                    {i < arr.length - 1 && <span className="text-muted-foreground/30">→</span>}
                   </span>
                 ))}
               </div>
-              <p className="mx-auto max-w-sm font-body text-sm leading-relaxed text-white/40">
-                A real-time AI voice interview. Click the mic button or press spacebar to start/stop recording.
+              <p className="mx-auto max-w-sm font-body text-sm leading-relaxed text-muted-foreground">
+                A real-time AI voice interview. Click the mic or press spacebar to toggle recording.
               </p>
             </div>
 
             <button
               onClick={startConversation}
               disabled={isConnecting}
-              className="group flex items-center gap-3 rounded-full bg-primary px-10 py-4 font-heading text-base font-bold uppercase tracking-wide text-white shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/30 disabled:opacity-50 disabled:shadow-none"
+              className="neo-btn bg-primary text-primary-foreground px-10 py-4 text-base shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 disabled:opacity-50"
             >
               {isConnecting ? (
                 <><span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> Connecting...</>
               ) : (
-                <><Sparkles className="h-5 w-5 transition-transform group-hover:scale-110" /> Start Interview</>
+                <><Sparkles className="h-5 w-5" /> Start Interview</>
               )}
             </button>
 
-            <p className="font-body text-[11px] text-white/25">Make sure your microphone is enabled</p>
+            <p className="font-body text-[11px] text-muted-foreground">Make sure your microphone is enabled</p>
           </div>
         ) : (
-          /* ─── LIVE INTERVIEW ─── */
-          <div className="flex w-full max-w-3xl flex-1 flex-col items-center justify-between gap-4 py-4">
-            {/* Orb */}
-            <div className="flex flex-1 flex-col items-center justify-center gap-3">
+          /* ─── LIVE INTERVIEW (Google Meet layout) ─── */
+          <div className="flex w-full max-w-5xl flex-1 gap-4 py-4">
+            {/* Main area: AI Orb (like the video feed area) */}
+            <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-ink/10 bg-card shadow-sm">
               <AIOrb state={orbState} size={200} />
-              <p className="font-body text-xs text-white/30">{statusLabel}</p>
+              <p className="mt-4 font-body text-sm text-muted-foreground">{statusLabel}</p>
+
+              {/* TTS text fallback */}
+              {textFallback && (
+                <div className="mx-4 mt-4 max-w-xl rounded-xl border-2 border-primary/20 bg-primary/5 p-5">
+                  <div className="mb-2 flex items-center gap-2">
+                    <VolumeX className="h-4 w-4 text-primary/70" />
+                    <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-primary/70">Audio unavailable — read below</span>
+                  </div>
+                  <p className="font-body text-sm leading-relaxed text-foreground/80">{textFallback}</p>
+                </div>
+              )}
             </div>
 
-            {/* TTS text fallback */}
-            {textFallback && (
-              <div className="w-full max-w-xl animate-fadeUp rounded-2xl border border-primary/20 bg-primary/[0.06] p-5 backdrop-blur-sm">
-                <div className="mb-2 flex items-center gap-2">
-                  <VolumeX className="h-4 w-4 text-primary/70" />
-                  <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-primary/70">Audio unavailable — read below</span>
+            {/* Sidebar: Transcript (like the chat panel) */}
+            <div className="flex w-80 flex-col rounded-2xl border-2 border-ink/10 bg-card shadow-sm">
+              <div className="border-b border-ink/10 px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-accent" />
+                  <span className="font-heading text-xs font-bold uppercase tracking-widest text-muted-foreground">Transcript</span>
                 </div>
-                <p className="font-body text-sm leading-relaxed text-white/80">{textFallback}</p>
               </div>
-            )}
-
-            {/* Transcript */}
-            <div className="w-full max-w-xl">
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 backdrop-blur-sm">
-                <div className="mb-3 flex items-center gap-2">
-                  <div className="h-1 w-1 rounded-full bg-accent" />
-                  <span className="font-heading text-[10px] font-bold uppercase tracking-widest text-white/30">Transcript</span>
-                </div>
-                <div className="max-h-40 space-y-2 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto p-4">
+                <div className="space-y-3">
                   {transcript.length === 0 ? (
-                    <p className="py-4 text-center font-body text-xs text-white/20">Conversation will appear here...</p>
+                    <p className="py-8 text-center font-body text-xs text-muted-foreground">Conversation will appear here...</p>
                   ) : (
-                    transcript.slice(-6).map((t, i) => (
-                      <div key={i} className={`flex gap-2 ${i === transcript.slice(-6).length - 1 ? "animate-fadeUp" : ""}`}>
-                        <span className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[10px] ${t.role === "ai" ? "bg-primary/20 text-primary" : "bg-accent/20 text-accent"}`}>
+                    transcript.slice(-8).map((t, i) => (
+                      <div key={i} className="flex gap-2">
+                        <span className={`mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${t.role === "ai" ? "bg-primary/15 text-primary" : "bg-accent/15 text-accent"}`}>
                           {t.role === "ai" ? "AI" : "Y"}
                         </span>
-                        <p className={`font-body text-sm leading-relaxed ${t.role === "ai" ? "text-white/70" : "text-white/50"}`}>
+                        <p className={`font-body text-sm leading-relaxed ${t.role === "ai" ? "text-foreground" : "text-muted-foreground"}`}>
                           {t.text}
                         </p>
                       </div>
@@ -571,10 +568,10 @@ const LiveInterview = () => {
         )}
       </div>
 
-      {/* Bottom controls */}
+      {/* Bottom controls bar (Google Meet style) */}
       {interviewStarted && (
-        <div className="relative z-10 flex items-center justify-center gap-5 border-t border-white/[0.06] bg-ink/80 py-5 backdrop-blur-xl">
-          {/* PTT button */}
+        <div className="relative z-10 flex items-center justify-center gap-5 border-t-2 border-ink/10 bg-card py-5">
+          {/* PTT toggle button */}
           <button
             onClick={() => {
               if (isPTTActive) {
@@ -584,19 +581,19 @@ const LiveInterview = () => {
               }
             }}
             disabled={processing || isTranscribing}
-            className={`relative flex h-16 w-16 items-center justify-center rounded-full transition-all select-none ${
+            className={`relative flex h-14 w-14 items-center justify-center rounded-full transition-all select-none ${
               isPTTActive
-                ? "bg-accent ring-4 ring-accent/40 scale-110 shadow-xl shadow-accent/30"
+                ? "bg-accent ring-4 ring-accent/30 scale-110 shadow-lg shadow-accent/20"
                 : isTranscribing
-                ? "bg-white/[0.06] text-white/40 cursor-wait"
+                ? "bg-muted text-muted-foreground cursor-wait"
                 : processing
-                ? "bg-white/[0.04] text-white/20 cursor-not-allowed"
-                : "bg-white/[0.08] text-white/70 hover:bg-white/[0.14] hover:text-white hover:shadow-lg"
+                ? "bg-muted text-muted-foreground/50 cursor-not-allowed"
+                : "bg-foreground/10 text-foreground hover:bg-foreground/20 hover:shadow-md"
             }`}
             title={isPTTActive ? "Stop recording (or press SPACE)" : "Start recording (or press SPACE)"}
           >
             {isTranscribing
-              ? <Loader2 className="h-6 w-6 animate-spin text-white/50" />
+              ? <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               : <Mic className={`h-6 w-6 ${isPTTActive ? "text-white" : ""}`} />
             }
             {isPTTActive && <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-accent animate-pulse" />}
@@ -604,7 +601,7 @@ const LiveInterview = () => {
 
           <button
             onClick={handleEndInterview}
-            className="flex h-14 w-24 items-center justify-center gap-2 rounded-full bg-destructive text-white font-heading text-xs font-bold uppercase tracking-wider transition-all hover:bg-destructive/90 hover:shadow-lg hover:shadow-destructive/25"
+            className="neo-btn bg-destructive text-white px-6 py-3"
           >
             <PhoneOff className="h-4 w-4" />
             End

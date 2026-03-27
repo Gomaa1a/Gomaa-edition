@@ -29,10 +29,10 @@ const InterviewTopBar = ({
   const timerColor = pct > 0.4 ? "text-accent" : pct > 0.15 ? "text-coral" : "text-destructive";
 
   return (
-    <div className="relative z-10 flex items-center justify-between border-b border-white/[0.06] bg-ink/80 px-6 py-3 backdrop-blur-xl">
+    <div className="relative z-10 flex items-center justify-between border-b-2 border-ink/10 bg-card px-6 py-3 shadow-sm">
       {/* Left: brand + live indicator */}
       <div className="flex items-center gap-3">
-        <span className="font-heading text-base font-bold tracking-tight text-white">
+        <span className="font-heading text-base font-bold tracking-tight text-foreground">
           Hire<span className="text-primary">Ready</span>
         </span>
         {interviewStarted && (
@@ -48,11 +48,11 @@ const InterviewTopBar = ({
       {/* Center: phase + question */}
       {interviewStarted && phase && (
         <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2">
-          <span className="rounded-md border border-white/10 bg-white/[0.05] px-3 py-1 font-heading text-[11px] font-semibold uppercase tracking-wider text-white/60">
+          <span className="rounded-md border-2 border-ink/10 bg-muted px-3 py-1 font-heading text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             {PHASE_LABELS[phase] || phase}
           </span>
           {questionCount !== undefined && questionCount > 0 && (
-            <span className="font-body text-[11px] text-white/40">
+            <span className="font-body text-[11px] text-muted-foreground">
               Q{questionCount}
             </span>
           )}
