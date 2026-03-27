@@ -1,0 +1,29 @@
+# Node
+node_modules/
+
+# Build outputs
+dist/
+
+# Environment
+.env
+
+# Media and archives
+*.mp4
+*.MP3
+*.zip
+*.exe
+*.png
+*.jpg
+*.jpeg
+*.csv
+
+# OS
+.DS_Store
+thumbs.db
+
+# Vite
+.vite/
+
+# IDE
+.vscode/
+.idea/
