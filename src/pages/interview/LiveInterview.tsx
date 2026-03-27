@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Mic, PhoneOff, VolumeX, Sparkles, ArrowRight, Loader2 } from "lucide-react";
+import { Mic, MicOff, PhoneOff, VolumeX, Sparkles, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import AIOrb from "@/components/interview/AIOrb";
@@ -10,8 +10,13 @@ import { Link } from "react-router-dom";
 
 type TranscriptEntry = { role: "ai" | "user"; text: string };
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://aawfizqhxluemkxmbaoq.supabase.co";
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhd2ZpenFoeGx1ZW1reG1iYW9xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNTk2OTEsImV4cCI6MjA4OTYzNTY5MX0.RYaSp2hjAmiYwuYvM4s30T2LOIZ9AtVzQA1FMjpakYg";
+
+// Voice Activity Detection config
+const VAD_THRESHOLD = 0.015; // volume level to count as speech
+const SILENCE_TIMEOUT_MS = 1800; // 1.8s of silence = done speaking
+const MIN_RECORD_MS = 600; // ignore recordings shorter than 600ms
 
 const LiveInterview = () => {
   const navigate = useNavigate();
@@ -29,19 +34,26 @@ const LiveInterview = () => {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [textFallback, setTextFallback] = useState<string | null>(null);
   const [insufficientCredits, setInsufficientCredits] = useState(false);
-  const [isPTTActive, setIsPTTActive] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [micMuted, setMicMuted] = useState(false);
 
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const endingRef = useRef(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const busyRef = useRef(false);
-  const isPTTActiveRef = useRef(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const firstCallDoneRef = useRef(false);
   const handleUserTurnRef = useRef<(text: string) => Promise<void>>();
+  // VAD refs
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const vadFrameRef = useRef<number>(0);
+  const silenceStartRef = useRef<number>(0);
+  const recordingStartRef = useRef<number>(0);
+  const isRecordingRef = useRef(false);
+  const micMutedRef = useRef(false);
 
   // ── Load interview metadata ──
   useEffect(() => {
@@ -70,22 +82,139 @@ const LiveInterview = () => {
     return () => clearInterval(timer);
   }, [interviewStarted]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Spacebar PTT toggle ──
-  useEffect(() => {
-    if (!interviewStarted) return;
-    const down = (e: KeyboardEvent) => { 
-      if (e.code === "Space" && !e.repeat && !processing && !isTranscribing) { 
-        e.preventDefault(); 
-        if (isPTTActiveRef.current) {
-          stopPTT();
-        } else {
-          startPTT();
+  // ── Voice Activity Detection loop ──
+  const startVADLoop = useCallback(() => {
+    const analyser = analyserRef.current;
+    if (!analyser) return;
+    const data = new Float32Array(analyser.fftSize);
+
+    const tick = () => {
+      if (!analyserRef.current) return; // stopped
+      analyser.getFloatTimeDomainData(data);
+
+      // RMS volume
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+      const rms = Math.sqrt(sum / data.length);
+
+      const now = Date.now();
+      const isSpeech = rms > VAD_THRESHOLD;
+
+      // Skip VAD while muted, AI speaking, processing, or transcribing
+      if (micMutedRef.current || busyRef.current) {
+        vadFrameRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      if (isSpeech) {
+        silenceStartRef.current = 0;
+        if (!isRecordingRef.current) {
+          // Start recording
+          startRecording();
         }
-      } 
+      } else if (isRecordingRef.current) {
+        if (silenceStartRef.current === 0) {
+          silenceStartRef.current = now;
+        } else if (now - silenceStartRef.current > SILENCE_TIMEOUT_MS) {
+          // Silence detected → stop and send
+          stopRecordingAndTranscribe();
+        }
+      }
+
+      vadFrameRef.current = requestAnimationFrame(tick);
     };
-    window.addEventListener("keydown", down);
-    return () => { window.removeEventListener("keydown", down); };
-  }, [interviewStarted, processing, isTranscribing]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    vadFrameRef.current = requestAnimationFrame(tick);
+  }, []);
+
+  // ── Start recording (called by VAD) ──
+  const startRecording = useCallback(() => {
+    if (isRecordingRef.current) return;
+    const stream = mediaStreamRef.current;
+    if (!stream) return;
+
+    // Interrupt AI speech when user starts talking
+    if (audioSourceRef.current) {
+      try { audioSourceRef.current.stop(); } catch { /* already ended */ }
+      audioSourceRef.current = null;
+    }
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    setAiSpeaking(false);
+
+    const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      ? "audio/webm;codecs=opus"
+      : MediaRecorder.isTypeSupported("audio/webm")
+      ? "audio/webm"
+      : "audio/ogg";
+
+    audioChunksRef.current = [];
+    const recorder = new MediaRecorder(stream, { mimeType });
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+    recorder.start(100);
+    mediaRecorderRef.current = recorder;
+    recordingStartRef.current = Date.now();
+    isRecordingRef.current = true;
+    setIsListening(true);
+  }, []);
+
+  // ── Stop recording and send to Whisper (called by VAD) ──
+  const stopRecordingAndTranscribe = useCallback(() => {
+    if (!isRecordingRef.current) return;
+    isRecordingRef.current = false;
+    silenceStartRef.current = 0;
+    setIsListening(false);
+
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state === "inactive") return;
+    mediaRecorderRef.current = null;
+
+    const recordDuration = Date.now() - recordingStartRef.current;
+
+    recorder.onstop = async () => {
+      if (audioChunksRef.current.length === 0) return;
+      const mimeType = recorder.mimeType || "audio/webm";
+      const blob = new Blob(audioChunksRef.current, { type: mimeType });
+      audioChunksRef.current = [];
+
+      // Ignore too-short recordings (noise/accidental)
+      if (blob.size < 3000 || recordDuration < MIN_RECORD_MS) return;
+
+      setIsTranscribing(true);
+      try {
+        const session = await supabase.auth.getSession();
+        const token = session.data.session?.access_token;
+        if (!token) throw new Error("No auth token");
+
+        const ext = mimeType.includes("ogg") ? "ogg" : "webm";
+        const formData = new FormData();
+        formData.append("audio", blob, `recording.${ext}`);
+        formData.append("language", interviewData?.language || "en");
+
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/whisper-transcribe`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, apikey: SUPABASE_ANON_KEY },
+          body: formData,
+        });
+
+        if (!res.ok) throw new Error(`Transcription failed: ${res.status}`);
+
+        const { text } = await res.json();
+        if (text?.trim()) {
+          setTranscript((prev) => [...prev, { role: "user", text: text.trim() }]);
+          if (!busyRef.current && handleUserTurnRef.current) {
+            handleUserTurnRef.current(text.trim());
+          }
+        }
+      } catch (e) {
+        console.error("Whisper error:", e);
+        toast.error("Could not transcribe your speech. Please try again.");
+      } finally {
+        setIsTranscribing(false);
+      }
+    };
+
+    recorder.stop();
+  }, [interviewData]);
 
   // ── AudioContext helper ──
   const ensureAudioContext = useCallback(async () => {
@@ -243,111 +372,31 @@ const LiveInterview = () => {
 
   useEffect(() => { handleUserTurnRef.current = handleUserTurn; }, [handleUserTurn]);
 
-  // ── PTT: start recording ──
-  const startPTT = useCallback(() => {
-    if (busyRef.current || isTranscribing || isPTTActiveRef.current) return;
-
-    // Interrupt AI speech
-    if (audioSourceRef.current) {
-      try { audioSourceRef.current.stop(); } catch { /* already ended */ }
-      audioSourceRef.current = null;
-    }
-    if (window.speechSynthesis) window.speechSynthesis.cancel();
-    setAiSpeaking(false);
-
-    const stream = mediaStreamRef.current;
-    if (!stream) { toast.error("Microphone not available"); return; }
-
-    const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-      ? "audio/webm;codecs=opus"
-      : MediaRecorder.isTypeSupported("audio/webm")
-      ? "audio/webm"
-      : "audio/ogg";
-
-    audioChunksRef.current = [];
-    const recorder = new MediaRecorder(stream, { mimeType });
-    recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
-    recorder.start(100);
-    mediaRecorderRef.current = recorder;
-
-    isPTTActiveRef.current = true;
-    setIsPTTActive(true);
-  }, [isTranscribing]);
-
-  // ── PTT: stop recording → Whisper ──
-  const stopPTT = useCallback(() => {
-    if (!isPTTActiveRef.current) return;
-    isPTTActiveRef.current = false;
-    setIsPTTActive(false);
-
-    const recorder = mediaRecorderRef.current;
-    if (!recorder || recorder.state === "inactive") return;
-    mediaRecorderRef.current = null;
-
-    recorder.onstop = async () => {
-      if (audioChunksRef.current.length === 0) return;
-      const mimeType = recorder.mimeType || "audio/webm";
-      const blob = new Blob(audioChunksRef.current, { type: mimeType });
-      audioChunksRef.current = [];
-
-      if (blob.size < 3000) return; // too short — ignore
-
-      setIsTranscribing(true);
-      try {
-        const session = await supabase.auth.getSession();
-        const token = session.data.session?.access_token;
-        if (!token) throw new Error("No auth token");
-
-        const ext = mimeType.includes("ogg") ? "ogg" : "webm";
-        const formData = new FormData();
-        formData.append("audio", blob, `recording.${ext}`);
-        formData.append("language", interviewData?.language || "en");
-
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/whisper-transcribe`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}`, apikey: SUPABASE_ANON_KEY },
-          body: formData,
-        });
-
-        if (!res.ok) throw new Error(`Transcription failed: ${res.status}`);
-
-        const { text } = await res.json();
-        if (text?.trim()) {
-          setTranscript((prev) => [...prev, { role: "user", text: text.trim() }]);
-          if (!busyRef.current && handleUserTurnRef.current) {
-            handleUserTurnRef.current(text.trim());
-          }
-        } else {
-          toast.info("Couldn't hear you clearly — please try again.");
-        }
-      } catch (e) {
-        console.error("Whisper error:", e);
-        toast.error("Could not transcribe your speech. Please try again.");
-      } finally {
-        setIsTranscribing(false);
-      }
-    };
-
-    recorder.stop();
-  }, []);
-
   // ── Start interview ──
   const startConversation = useCallback(async () => {
     setIsConnecting(true);
     try {
       // Mic + AudioContext in parallel
-      const [stream] = await Promise.all([
+      const [stream, audioCtx] = await Promise.all([
         navigator.mediaDevices.getUserMedia({ audio: true }),
         ensureAudioContext(),
       ]);
       mediaStreamRef.current = stream;
 
+      // Set up audio analyser for Voice Activity Detection
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 2048;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
       // Pre-warm speech synthesis voices while connecting
       if (window.speechSynthesis) window.speechSynthesis.getVoices();
 
       setInterviewStarted(true);
-      // Kick off the first AI call — no extra credit-check roundtrip needed
-      // (orchestrator handles credit deduction on first call and returns 402 if insufficient)
+      // Start the VAD loop — microphone is always on
+      startVADLoop();
+      // Kick off the first AI call
       await callOrchestrator();
     } catch (error) {
       const msg = (error as Error).message;
@@ -360,12 +409,16 @@ const LiveInterview = () => {
     } finally {
       setIsConnecting(false);
     }
-  }, [callOrchestrator, ensureAudioContext]);
+  }, [callOrchestrator, ensureAudioContext, startVADLoop]);
 
   // ── End interview ──
   const handleEndInterview = useCallback(async () => {
     if (endingRef.current) return;
     endingRef.current = true;
+
+    // Stop VAD loop
+    if (vadFrameRef.current) cancelAnimationFrame(vadFrameRef.current);
+    analyserRef.current = null;
 
     if (audioSourceRef.current) {
       try { audioSourceRef.current.stop(); } catch { /* ok */ }
@@ -414,18 +467,20 @@ const LiveInterview = () => {
     ? "Your interview is starting, please wait..."
     : isTranscribing
     ? "Transcribing your answer..."
-    : isPTTActive
-    ? "Speaking... (click or press SPACE to stop)"
+    : isListening
+    ? "Listening..."
     : processing
     ? "AI is thinking..."
     : aiSpeaking
     ? "Interviewer is speaking..."
-    : "Click mic button or press SPACE to start speaking";
+    : micMuted
+    ? "Microphone muted"
+    : "Listening for your voice...";
 
   const orbState: "idle" | "listening" | "thinking" | "speaking" =
     aiSpeaking ? "speaking"
     : processing || isTranscribing ? "thinking"
-    : isPTTActive ? "listening"
+    : isListening ? "listening"
     : "idle";
 
   // ── Insufficient credits screen ──
@@ -498,7 +553,7 @@ const LiveInterview = () => {
                 ))}
               </div>
               <p className="mx-auto max-w-sm font-body text-sm leading-relaxed text-muted-foreground">
-                A real-time AI voice interview. Click the mic or press spacebar to toggle recording.
+                A real-time AI voice interview. Just speak naturally — the AI listens automatically.
               </p>
             </div>
 
@@ -571,32 +626,36 @@ const LiveInterview = () => {
       {/* Bottom controls bar (Google Meet style) */}
       {interviewStarted && (
         <div className="relative z-10 flex items-center justify-center gap-5 border-t-2 border-ink/10 bg-card py-5">
-          {/* PTT toggle button */}
+          {/* Mute/unmute mic button */}
           <button
             onClick={() => {
-              if (isPTTActive) {
-                stopPTT();
-              } else {
-                startPTT();
+              const next = !micMuted;
+              setMicMuted(next);
+              micMutedRef.current = next;
+              // If unmuting and currently recording, stop it cleanly
+              if (next && isRecordingRef.current) {
+                isRecordingRef.current = false;
+                setIsListening(false);
+                if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+                  mediaRecorderRef.current.stop();
+                  mediaRecorderRef.current = null;
+                }
               }
             }}
-            disabled={processing || isTranscribing}
             className={`relative flex h-14 w-14 items-center justify-center rounded-full transition-all select-none ${
-              isPTTActive
+              micMuted
+                ? "bg-destructive/15 text-destructive hover:bg-destructive/25"
+                : isListening
                 ? "bg-accent ring-4 ring-accent/30 scale-110 shadow-lg shadow-accent/20"
-                : isTranscribing
-                ? "bg-muted text-muted-foreground cursor-wait"
-                : processing
-                ? "bg-muted text-muted-foreground/50 cursor-not-allowed"
                 : "bg-foreground/10 text-foreground hover:bg-foreground/20 hover:shadow-md"
             }`}
-            title={isPTTActive ? "Stop recording (or press SPACE)" : "Start recording (or press SPACE)"}
+            title={micMuted ? "Unmute microphone" : "Mute microphone"}
           >
-            {isTranscribing
-              ? <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              : <Mic className={`h-6 w-6 ${isPTTActive ? "text-white" : ""}`} />
+            {micMuted
+              ? <MicOff className="h-6 w-6" />
+              : <Mic className={`h-6 w-6 ${isListening ? "text-white" : ""}`} />
             }
-            {isPTTActive && <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-accent animate-pulse" />}
+            {isListening && !micMuted && <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-accent animate-pulse" />}
           </button>
 
           <button
