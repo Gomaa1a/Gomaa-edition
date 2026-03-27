@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Download, Linkedin, Facebook, Twitter, Instagram } from "lucide-react";
+import { Download, Share2, ExternalLink } from "lucide-react";
 
 interface ShareResultsProps {
   overallScore: number;
@@ -205,25 +205,25 @@ const ShareResults = (props: ShareResultsProps) => {
   const buttons = [
     {
       label: "LinkedIn",
-      icon: Linkedin,
+      icon: Share2,
       onClick: () => window.open(shareLinks.linkedin, "_blank", "width=600,height=600"),
       className: "bg-[#0A66C2] hover:bg-[#004182] text-white",
     },
     {
       label: "Facebook",
-      icon: Facebook,
+      icon: Share2,
       onClick: () => window.open(shareLinks.facebook, "_blank", "width=600,height=600"),
       className: "bg-[#1877F2] hover:bg-[#0d5bbf] text-white",
     },
     {
       label: "X (Twitter)",
-      icon: Twitter,
+      icon: Share2,
       onClick: () => window.open(shareLinks.twitter, "_blank", "width=600,height=600"),
       className: "bg-foreground hover:bg-foreground/80 text-background",
     },
     {
-      label: "Instagram",
-      icon: Instagram,
+      label: "Download",
+      icon: Download,
       onClick: handleInstagramShare,
       className: "bg-gradient-to-br from-[#f09433] via-[#dc2743] to-[#bc1888] hover:opacity-90 text-white",
     },
